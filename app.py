@@ -110,15 +110,24 @@ class AppState(TypedDict):
     # Final output
     final_report: FinalReport
 
-# Initialize embeddings
-if embeddings_available:
-    from langchain_community.embeddings import HuggingFaceEmbeddings
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-else:
-    # Fallback to OpenAI embeddings if sentence-transformers not available
+
+try:
+    
+    from openai import OpenAI
+    client = OpenAI(api_key=openai_api_key)
+    
+    
     from langchain_openai import OpenAIEmbeddings
-    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-    st.warning("Using OpenAI embeddings as fallback")
+    embeddings = OpenAIEmbeddings(client=client, model="text-embedding-3-small")
+except Exception as e:
+    st.warning(f"OpenAI embeddings initialization failed: {e}")
+    try:
+        
+        from langchain_community.embeddings import HuggingFaceEmbeddings
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    except Exception as e:
+        st.error(f"Couldn't initialize any embeddings: {e}")
+        raise
 
 # Function to load or create FAISS stores
 def get_or_create_faiss_store(store_name: str):
