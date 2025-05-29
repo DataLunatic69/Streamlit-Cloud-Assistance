@@ -11,6 +11,7 @@ if platform.system() == "Linux" or os.environ.get("STREAMLIT_SHARING_MODE"):
     except ImportError:
         pass  # pysqlite3-binary not available, continue with system SQLite
 
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -111,31 +112,22 @@ class AppState(TypedDict):
 
 
 try:
-    # First try OpenAI embeddings (preferred)
+    
+    from openai import OpenAI
+    client = OpenAI(api_key=openai_api_key)
+    
+    
     from langchain_openai import OpenAIEmbeddings
-    embeddings = OpenAIEmbeddings(
-        openai_api_key=openai_api_key,
-        model="text-embedding-3-small"
-    )
+    embeddings = OpenAIEmbeddings(client=client, model="text-embedding-3-small")
 except Exception as e:
-    st.warning(f"OpenAI embeddings failed: {e}. Trying alternatives...")
+    st.warning(f"OpenAI embeddings initialization failed: {e}")
     try:
-        # Try to install sentence-transformers if missing
-        import subprocess
-        import sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "sentence-transformers"])
         
-        # Now try HuggingFace embeddings
         from langchain_community.embeddings import HuggingFaceEmbeddings
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     except Exception as e:
-        st.error(f"All embedding options failed: {e}")
-        embeddings = None
-        raise RuntimeError("Could not initialize any embedding model")
-
-if embeddings is None:
-    st.error("No working embeddings available. The app cannot function without embeddings.")
-    st.stop()
+        st.error(f"Couldn't initialize any embeddings: {e}")
+        raise
 
 # Function to load or create FAISS stores
 def get_or_create_faiss_store(store_name: str):
