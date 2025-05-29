@@ -10,7 +10,7 @@ langchain==0.1.13
 langchain-community==0.0.34
 # langchain-chroma==0.1.4
 langchain-groq==0.0.1
-langgraph==0.0.10
+langgraph==0.0.40
 
 # Transformers + torch
 transformers==4.35.2
