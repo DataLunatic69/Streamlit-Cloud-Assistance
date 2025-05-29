@@ -5,7 +5,7 @@ numpy==1.26.0
 scipy==1.11.4
 
 # LangChain ecosystem with pinned versions
-langchain-core==0.1.45
+langchain-core==0.1.46
 langchain==0.1.13
 langchain-community==0.0.34
 # langchain-chroma==0.1.4
