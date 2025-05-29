@@ -1,0 +1,10 @@
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+chroma_price_store/
+chroma_news_store/
+temp_audio.wav".streamlit/secrets.toml" 
