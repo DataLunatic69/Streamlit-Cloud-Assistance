@@ -31,19 +31,27 @@ from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langgraph.graph import StateGraph
 from langchain_groq import ChatGroq
 import torch
-import sounddevice as sd
-from scipy.io.wavfile import write
 from dotenv import load_dotenv
 import openai  
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import pickle
+from io import BytesIO
+import base64
 
 # Load environment variables
 load_dotenv()
 
-openai_api_key = st.secrets["OPENAI_API_KEY"]
-groq_api_key = st.secrets["GROQ_API_KEY"]
-aplha_vantage_key = st.secrets["ALPHAVANTAGE_API_KEY"]
+# Try Streamlit secrets first, fall back to .env
+def get_secret(key):
+    try:
+        return st.secrets[key]  # For Streamlit Cloud
+    except:
+        load_dotenv()  # For local development
+        return os.getenv(key)
+
+openai_api_key = get_secret("OPENAI_API_KEY")
+groq_api_key = get_secret("GROQ_API_KEY")
+alpha_vantage_key = get_secret("ALPHAVANTAGE_API_KEY")
 
 # Configuration
 MODEL = "deepseek-r1-distill-llama-70b"
@@ -137,53 +145,35 @@ news_vector_store = get_or_create_faiss_store("news_data")
 # Speech Processing
 class RealtimeSpeechProcessor:
     def __init__(self):
-        self.sample_rate = 16000
-        self.duration = 7  # seconds
         self.openai_client = openai.OpenAI(api_key=openai_api_key)
         st.info("✅ OpenAI Whisper ready for speech processing")
         
-    def record_audio(self):
-        """Record audio from microphone in real-time"""
-        st.info(f"🎤 Listening for {self.duration} seconds... (speak now)")
-        audio = sd.rec(
-            int(self.duration * self.sample_rate),
-            samplerate=self.sample_rate,
-            channels=1,
-            dtype='float32'
-        )
-        sd.wait()  # Wait until recording is finished
-        return audio
-    
-    def save_temp_audio(self, audio):
-        """Save audio to temporary WAV file for Whisper processing"""
-        temp_file = "temp_audio.wav"
-        write(temp_file, self.sample_rate, audio)
-        return temp_file
-    
     def transcribe_realtime(self):
-        """Record and transcribe audio using OpenAI Whisper"""
+        """Use Streamlit's native audio recorder"""
+        audio_bytes = st.audio(
+            "Press to record", 
+            format="wav",
+            start_recording=True,
+            sample_rate=16000,
+            key="audio_recorder"
+        )
+        
+        if not audio_bytes:
+            return ""
+
         try:
-            # Record audio
-            audio = self.record_audio()
-            
-            # Save to temporary file
-            audio_file = self.save_temp_audio(audio)
+            # Convert bytes to file-like object
+            audio_file = BytesIO(audio_bytes)
+            audio_file.name = "recording.wav"
             
             # Transcribe using OpenAI Whisper
             st.info("🔍 Transcribing audio...")
-            with open(audio_file, "rb") as f:
-                transcription = self.openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f,
-                    response_format="text"
-                )
-            
-            # Clean up temporary file
-            if os.path.exists(audio_file):
-                os.remove(audio_file)
-            
+            transcription = self.openai_client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file,
+                response_format="text"
+            )
             return transcription
-            
         except Exception as e:
             st.error(f"Transcription error: {e}")
             return ""
@@ -263,7 +253,7 @@ def price_api_agent(state: AppState) -> Dict[str, Any]:
     documents = []
     
     try:
-        alpha_vantage = AlphaVantageAPIWrapper()
+        alpha_vantage = AlphaVantageAPIWrapper(alpha_vantage_key=alpha_vantage_key)
         
         for company in keywords.companies[:5]:
             try:
