@@ -1,6 +1,7 @@
 import os
 import platform
-
+import os
+os.environ["STREAMLIT_SERVER_ENABLE_WATCHER"] = "false"
 # Only apply SQLite fix on Linux (Streamlit Cloud)
 if platform.system() == "Linux" or os.environ.get("STREAMLIT_SHARING_MODE"):
     try:
@@ -112,43 +113,23 @@ class AppState(TypedDict):
 
 embeddings = None
 try:
-    # Try OpenAI embeddings with client initialization
-    from openai import OpenAI
-    client = OpenAI(api_key=openai_api_key)
+    # Try OpenAI embeddings with direct initialization
     from langchain_openai import OpenAIEmbeddings
     embeddings = OpenAIEmbeddings(
-        client=client,
+        openai_api_key=openai_api_key,
         model="text-embedding-3-small"
     )
 except Exception as e:
     st.warning(f"OpenAI embeddings failed: {str(e)}. Trying alternatives...")
     
     try:
-        # Try HuggingFace embeddings with explicit installation
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError:
-            st.warning("Installing sentence-transformers...")
-            import sys
-            import subprocess
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "sentence-transformers==2.2.2"])
-        
+        # Try HuggingFace embeddings
         from langchain_community.embeddings import HuggingFaceEmbeddings
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     except Exception as e:
         st.error(f"HuggingFace embeddings failed: {str(e)}")
-        
-        # Final fallback to FAISS embeddings
-        try:
-            from langchain_community.embeddings import HuggingFaceEmbeddings
-            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        except Exception as e:
-            st.error(f"All embedding options failed: {str(e)}")
-            raise RuntimeError("Could not initialize any embedding model")
-
-if embeddings is None:
-    st.error("No working embeddings available. The app cannot function without embeddings.")
-    st.stop()
+        st.error("Could not initialize any embedding model. The app cannot function without embeddings.")
+        st.stop()
 
 # Function to load or create FAISS stores
 def get_or_create_faiss_store(store_name: str):

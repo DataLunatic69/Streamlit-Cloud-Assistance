@@ -36,4 +36,4 @@ protobuf==4.25.1
 faiss-cpu
 sentence-transformers
 
-
+watchdog>=3.0.0
