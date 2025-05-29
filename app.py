@@ -36,6 +36,13 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 import pickle
 from io import BytesIO
 import base64
+from langchain_openai import OpenAIEmbeddings
+try:
+    from sentence_transformers import SentenceTransformer
+    embeddings_available = True
+except ImportError:
+    embeddings_available = False
+    st.warning("sentence-transformers not available, using fallback embeddings")
 
 
 
@@ -104,7 +111,14 @@ class AppState(TypedDict):
     final_report: FinalReport
 
 # Initialize embeddings
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+if embeddings_available:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+else:
+    # Fallback to OpenAI embeddings if sentence-transformers not available
+    from langchain_openai import OpenAIEmbeddings
+    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+    st.warning("Using OpenAI embeddings as fallback")
 
 # Function to load or create FAISS stores
 def get_or_create_faiss_store(store_name: str):
