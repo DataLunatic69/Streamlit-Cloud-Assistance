@@ -5,11 +5,11 @@ numpy==1.26.0
 scipy==1.11.4
 
 # LangChain ecosystem with pinned versions
-langchain==0.1.13
 langchain-core==0.1.45
+langchain==0.1.13
 langchain-community==0.0.34
+langchain-chroma==0.1.4
 chromadb==0.4.24
-langchain-chroma==0.2.4
 langchain-groq==0.0.1
 langgraph==0.0.10
 
