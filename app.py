@@ -113,7 +113,6 @@ class AppState(TypedDict):
 
 embeddings = None
 try:
-    # Try OpenAI embeddings with direct initialization
     from langchain_openai import OpenAIEmbeddings
     embeddings = OpenAIEmbeddings(
         openai_api_key=openai_api_key,
@@ -121,16 +120,12 @@ try:
     )
 except Exception as e:
     st.warning(f"OpenAI embeddings failed: {str(e)}. Trying alternatives...")
-    
     try:
-        # Try HuggingFace embeddings
         from langchain_community.embeddings import HuggingFaceEmbeddings
         embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     except Exception as e:
-        st.error(f"HuggingFace embeddings failed: {str(e)}")
-        st.error("Could not initialize any embedding model. The app cannot function without embeddings.")
+        st.error(f"All embedding options failed: {str(e)}")
         st.stop()
-
 # Function to load or create FAISS stores
 def get_or_create_faiss_store(store_name: str):
     store_path = f"./faiss_{store_name}_store"
