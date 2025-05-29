@@ -31,27 +31,17 @@ from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langgraph.graph import StateGraph
 from langchain_groq import ChatGroq
 import torch
-from dotenv import load_dotenv
 import openai  
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import pickle
 from io import BytesIO
 import base64
 
-# Load environment variables
-load_dotenv()
 
-# Try Streamlit secrets first, fall back to .env
-def get_secret(key):
-    try:
-        return st.secrets[key]  # For Streamlit Cloud
-    except:
-        load_dotenv()  # For local development
-        return os.getenv(key)
 
-openai_api_key = get_secret("OPENAI_API_KEY")
-groq_api_key = get_secret("GROQ_API_KEY")
-alpha_vantage_key = get_secret("ALPHAVANTAGE_API_KEY")
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+groq_api_key = st.secrets["GROQ_API_KEY"]
+alpha_vantage_key = st.secrets["ALPHAVANTAGE_API_KEY"]
 
 # Configuration
 MODEL = "deepseek-r1-distill-llama-70b"
