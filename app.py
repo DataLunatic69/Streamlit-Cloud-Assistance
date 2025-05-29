@@ -24,6 +24,7 @@ import sounddevice as sd
 from scipy.io.wavfile import write
 from dotenv import load_dotenv
 import openai  
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Load environment variables
 load_dotenv()
