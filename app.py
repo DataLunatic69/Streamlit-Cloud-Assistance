@@ -1,4 +1,3 @@
-# SQLite fix for Streamlit Cloud - MUST be at the very top
 import os
 import platform
 
@@ -111,23 +110,45 @@ class AppState(TypedDict):
     final_report: FinalReport
 
 
+embeddings = None
 try:
-    
+    # Try OpenAI embeddings with client initialization
     from openai import OpenAI
     client = OpenAI(api_key=openai_api_key)
-    
-    
     from langchain_openai import OpenAIEmbeddings
-    embeddings = OpenAIEmbeddings(client=client, model="text-embedding-3-small")
+    embeddings = OpenAIEmbeddings(
+        client=client,
+        model="text-embedding-3-small"
+    )
 except Exception as e:
-    st.warning(f"OpenAI embeddings initialization failed: {e}")
+    st.warning(f"OpenAI embeddings failed: {str(e)}. Trying alternatives...")
+    
     try:
+        # Try HuggingFace embeddings with explicit installation
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            st.warning("Installing sentence-transformers...")
+            import sys
+            import subprocess
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "sentence-transformers==2.2.2"])
         
         from langchain_community.embeddings import HuggingFaceEmbeddings
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     except Exception as e:
-        st.error(f"Couldn't initialize any embeddings: {e}")
-        raise
+        st.error(f"HuggingFace embeddings failed: {str(e)}")
+        
+        # Final fallback to FAISS embeddings
+        try:
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        except Exception as e:
+            st.error(f"All embedding options failed: {str(e)}")
+            raise RuntimeError("Could not initialize any embedding model")
+
+if embeddings is None:
+    st.error("No working embeddings available. The app cannot function without embeddings.")
+    st.stop()
 
 # Function to load or create FAISS stores
 def get_or_create_faiss_store(store_name: str):
