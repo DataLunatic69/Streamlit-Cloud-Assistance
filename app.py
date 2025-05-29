@@ -1,3 +1,16 @@
+# SQLite fix for Streamlit Cloud - MUST be at the very top
+import os
+import platform
+
+# Only apply SQLite fix on Linux (Streamlit Cloud)
+if platform.system() == "Linux" or os.environ.get("STREAMLIT_SHARING_MODE"):
+    try:
+        __import__('pysqlite3')
+        import sys
+        sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+    except ImportError:
+        pass  # pysqlite3-binary not available, continue with system SQLite
+
 import os
 import pandas as pd
 import numpy as np
@@ -13,7 +26,7 @@ from langchain_community.utilities.alpha_vantage import AlphaVantageAPIWrapper
 from langchain_community.tools.yahoo_finance_news import YahooFinanceNewsTool
 from langchain_community.document_loaders import WebBaseLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import create_react_agent
@@ -24,6 +37,7 @@ from scipy.io.wavfile import write
 from dotenv import load_dotenv
 import openai  
 from langchain_community.embeddings import HuggingFaceEmbeddings
+import pickle
 
 # Load environment variables
 load_dotenv()
@@ -92,20 +106,34 @@ class AppState(TypedDict):
     # Final output
     final_report: FinalReport
 
-# Initialize vector stores
+# Initialize embeddings
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-price_vector_store = Chroma(
-    collection_name="price_data",
-    embedding_function=embeddings,
-    persist_directory="./chroma_price_store"
-)
+# Function to load or create FAISS stores
+def get_or_create_faiss_store(store_name: str):
+    store_path = f"./faiss_{store_name}_store"
+    
+    if os.path.exists(f"{store_path}.faiss") and os.path.exists(f"{store_path}.pkl"):
+        try:
+            # Load existing store
+            return FAISS.load_local(store_path, embeddings, allow_dangerous_deserialization=True)
+        except Exception as e:
+            st.warning(f"Could not load existing {store_name} store: {e}")
+            # Create new store if loading fails
+            pass
+    
+    # Create new empty store with a dummy document
+    dummy_doc = Document(page_content="Initialization document", metadata={"type": "init"})
+    store = FAISS.from_documents([dummy_doc], embeddings)
+    try:
+        store.save_local(store_path)
+    except Exception as e:
+        st.warning(f"Could not save {store_name} store: {e}")
+    return store
 
-news_vector_store = Chroma(
-    collection_name="news_data", 
-    embedding_function=embeddings,
-    persist_directory="./chroma_news_store"
-)
+# Initialize FAISS vector stores
+price_vector_store = get_or_create_faiss_store("price_data")
+news_vector_store = get_or_create_faiss_store("news_data")
 
 # Speech Processing
 class RealtimeSpeechProcessor:
@@ -299,7 +327,12 @@ def price_api_agent(state: AppState) -> Dict[str, Any]:
             documents.append(doc)
     
     if documents:
-        price_vector_store.add_documents(documents)
+        try:
+            price_vector_store.add_documents(documents)
+            # Save the updated store
+            price_vector_store.save_local("./faiss_price_data_store")
+        except Exception as e:
+            st.warning(f"Could not save price vector store: {e}")
     
     return {"price_documents": documents}
 
@@ -377,7 +410,12 @@ def news_api_agent(state: AppState) -> Dict[str, Any]:
             documents.append(doc)
     
     if documents:
-        news_vector_store.add_documents(documents)
+        try:
+            news_vector_store.add_documents(documents)
+            # Save the updated store
+            news_vector_store.save_local("./faiss_news_data_store")
+        except Exception as e:
+            st.warning(f"Could not save news vector store: {e}")
     
     return {"news_documents": documents}
 
@@ -388,8 +426,12 @@ def price_retriever_agent(state: AppState) -> Dict[str, Any]:
     
     enhanced_query = f"{query} price technical analysis {' '.join(keywords.companies)} {' '.join(keywords.financial_terms)}"
     
-    price_retriever = price_vector_store.as_retriever(search_kwargs={"k": 10})
-    relevant_docs = price_retriever.invoke(enhanced_query)
+    try:
+        price_retriever = price_vector_store.as_retriever(search_kwargs={"k": 10})
+        relevant_docs = price_retriever.invoke(enhanced_query)
+    except Exception as e:
+        st.warning(f"Price retrieval error: {e}")
+        relevant_docs = []
     
     return {"relevant_price_docs": relevant_docs}
 
@@ -400,8 +442,12 @@ def news_retriever_agent(state: AppState) -> Dict[str, Any]:
     
     enhanced_query = f"{query} news earnings sentiment {' '.join(keywords.companies)} {' '.join(keywords.financial_terms)}"
     
-    news_retriever = news_vector_store.as_retriever(search_kwargs={"k": 10})
-    relevant_docs = news_retriever.invoke(enhanced_query)
+    try:
+        news_retriever = news_vector_store.as_retriever(search_kwargs={"k": 10})
+        relevant_docs = news_retriever.invoke(enhanced_query)
+    except Exception as e:
+        st.warning(f"News retrieval error: {e}")
+        relevant_docs = []
     
     return {"relevant_news_docs": relevant_docs}
 
