@@ -13,7 +13,6 @@ from langchain_community.utilities.alpha_vantage import AlphaVantageAPIWrapper
 from langchain_community.tools.yahoo_finance_news import YahooFinanceNewsTool
 from langchain_community.document_loaders import WebBaseLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langgraph.graph import StateGraph, END
